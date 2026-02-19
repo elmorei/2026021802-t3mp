@@ -7,7 +7,8 @@ This repository now hosts a lowpoly 3D isometric-style browser demo featuring:
 - A player cloud you can move with **WASD / Arrow keys** or **click/tap-to-move**.
 - Procedurally generated multi-scale terrain with **large oceans**, **high ranges**, **water**, and **trees**.
 - Chunk-based streaming so terrain supports effectively **unlimited travel** in any direction.
-- Cloud lifecycle behavior: over water it gains vapor and grows, and at high elevations it darkens/rains and shrinks.
+- Cloud lifecycle behavior: over water it gains sparkling vapor and grows, and at high elevations it darkens/rains then shrinks back toward white.
+- Transparent shallow-water rendering with a lighter color palette.
 
 ## Steps to take the page live after merge
 
