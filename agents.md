@@ -1,5 +1,5 @@
 # Repository Agent Notes
 
-- This repository hosts a static GitHub Pages site.
-- The deployable page entrypoint is `index.html` in the repository root.
-- Keep the site dependency-free so it can be served directly by GitHub Pages.
+- This repository hosts a static GitHub Pages scene in `index.html`.
+- The current experience is a lowpoly Three.js cloud explorer with procedural chunk streaming.
+- Keep it dependency-light and deployable directly from repository root on GitHub Pages.

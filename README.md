@@ -1,11 +1,12 @@
 https://<your-github-username>.github.io/2026021802-t3mp/
 
-# Flags! GitHub Page
+# Lowpoly Cloud Explorer (GitHub Pages)
 
-This repo contains a single-page GitHub Pages site with:
-- A bouncing **"Flags!"** heading.
-- Click-to-change heading color.
-- A full-screen, animated **4D simplex noise** background.
+This repository now hosts a lowpoly 3D isometric-style browser demo featuring:
+- A player cloud you can move with **WASD / Arrow keys**.
+- Procedurally generated terrain with **height variation**, **water**, and **trees**.
+- Chunk-based streaming so terrain supports effectively **unlimited travel** in any direction.
+- A camera that remains centered on the cloud player.
 
 ## Steps to take the page live after merge
 
@@ -20,10 +21,12 @@ This repo contains a single-page GitHub Pages site with:
 
 ## Local preview
 
-You can run a local web server from the repository root:
-
 ```bash
 python3 -m http.server 4173
 ```
 
 Then open <http://localhost:4173>.
+
+## Expansion notes
+
+The terrain system is intentionally configured via the `CONFIG` object in `index.html` to make future scope expansion easier (biomes, resources, weather, NPCs, structures, etc.).
