@@ -57,8 +57,9 @@
       const state = {
         x: 0,
         y: 0,
-        vx: 210,
-        vy: 165,
+        vx: 260,
+        vy: 205,
+        speedBoost: 1,
         hue: 0,
         t: 0,
       };
@@ -69,6 +70,7 @@
       let noiseData = null;
       let noiseWidth = 0;
       let noiseHeight = 0;
+      let lastNoiseRender = 0;
 
       // 4D simplex noise implementation based on Stefan Gustavson's public domain algorithm.
       const grad4 = [
@@ -235,7 +237,7 @@
         clampFlagsPosition();
 
         // Render noise at lower internal resolution to avoid per-frame memory pressure.
-        const maxPixels = 230000;
+        const maxPixels = 135000;
         const targetPixels = canvas.width * canvas.height;
         const downscale = Math.max(1, Math.sqrt(targetPixels / maxPixels));
         noiseWidth = Math.max(96, Math.floor(canvas.width / downscale));
@@ -248,8 +250,9 @@
       }
 
       function changeFlagsColor() {
-        state.hue = (state.hue + 47 + Math.random() * 180) % 360;
-        flags.style.color = `hsl(${state.hue.toFixed(1)}deg 95% 62%)`;
+        state.hue = (state.hue + 110 + Math.random() * 210) % 360;
+        state.speedBoost = Math.min(2.6, state.speedBoost + 0.22);
+        flags.style.color = `hsl(${state.hue.toFixed(1)}deg 96% 64%)`;
       }
 
       flags.addEventListener('click', changeFlagsColor);
@@ -265,8 +268,10 @@
         state.t += dt;
 
         // Move and bounce the title within viewport bounds.
-        state.x += state.vx * dt;
-        state.y += state.vy * dt;
+        state.speedBoost += (1 - state.speedBoost) * Math.min(1, dt * 2.4);
+        const motionScale = state.speedBoost;
+        state.x += state.vx * motionScale * dt;
+        state.y += state.vy * motionScale * dt;
 
         const titleRect = flags.getBoundingClientRect();
         const maxX = Math.max(0, window.innerWidth - titleRect.width);
@@ -296,29 +301,32 @@
           return;
         }
 
-        const scale = 0.012;
-        const timeFreq = state.t * 0.35;
+        const noiseFrameIntervalMs = 33;
+        if (now - lastNoiseRender >= noiseFrameIntervalMs) {
+          const scale = 0.015;
+          const timeFreq = state.t * 0.5;
 
-        for (let py = 0; py < noiseHeight; py++) {
-          for (let px = 0; px < noiseWidth; px++) {
-            const i = (py * noiseWidth + px) * 4;
-            const nx = px * scale;
-            const ny = py * scale;
+          for (let py = 0; py < noiseHeight; py++) {
+            for (let px = 0; px < noiseWidth; px++) {
+              const i = (py * noiseWidth + px) * 4;
+              const nx = px * scale;
+              const ny = py * scale;
 
-            const n1 = simplex4D(nx, ny, timeFreq, 0.0);
-            const n2 = simplex4D(nx * 1.8, ny * 1.8, 2.7, timeFreq * 1.4);
-            const n3 = simplex4D(nx * 3.2, ny * 3.2, 5.4, timeFreq * 2.1);
-            const value = Math.max(-1, Math.min(1, n1 * 0.62 + n2 * 0.28 + n3 * 0.1));
-            const v = Math.floor((value * 0.5 + 0.5) * 255);
+              const n1 = simplex4D(nx, ny, timeFreq, 0.0);
+              const n2 = simplex4D(nx * 1.9, ny * 1.9, 2.2, timeFreq * 1.35);
+              const value = Math.max(-1, Math.min(1, n1 * 0.72 + n2 * 0.28));
+              const v = (value * 0.5 + 0.5) * 255;
 
-            noiseData[i] = Math.min(255, 30 + v * 0.3);
-            noiseData[i + 1] = Math.min(255, 40 + v * 0.45);
-            noiseData[i + 2] = Math.min(255, 75 + v * 0.7);
-            noiseData[i + 3] = 255;
+              noiseData[i] = 30 + v * 0.3;
+              noiseData[i + 1] = 40 + v * 0.45;
+              noiseData[i + 2] = 75 + v * 0.7;
+              noiseData[i + 3] = 255;
+            }
           }
-        }
 
-        noiseCtx.putImageData(noiseImageData, 0, 0);
+          noiseCtx.putImageData(noiseImageData, 0, 0);
+          lastNoiseRender = now;
+        }
         ctx.imageSmoothingEnabled = true;
         ctx.drawImage(noiseBuffer, 0, 0, canvas.width, canvas.height);
         requestAnimationFrame(frame);
