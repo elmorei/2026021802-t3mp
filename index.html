@@ -1,0 +1,656 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Isometric Cloud Cycle</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: linear-gradient(#8dc8ff, #dff2ff);
+        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        touch-action: none;
+      }
+
+      #settings {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        z-index: 11;
+        color: #ecf8ff;
+        background: rgb(10 30 52 / 72%);
+        border-radius: 10px;
+        border: 1px solid rgb(189 232 255 / 35%);
+        width: fit-content;
+      }
+
+      #settings summary {
+        list-style: none;
+        cursor: pointer;
+        user-select: none;
+        font-size: 1.1rem;
+        padding: 8px 10px;
+      }
+
+      #settings summary::-webkit-details-marker {
+        display: none;
+      }
+
+      #settings-panel {
+        padding: 0 10px 10px;
+        font-size: 0.85rem;
+        width: min(380px, 92vw);
+        max-height: none;
+        overflow: visible;
+      }
+
+      #settings-panel label {
+        display: block;
+        margin-bottom: 6px;
+      }
+
+      #settings-panel input {
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <details id="settings">
+      <summary aria-label="Settings">⚙️</summary>
+      <div id="settings-panel">
+        <label for="view-angle">View angle: <span id="view-angle-value">20°</span></label>
+        <input id="view-angle" type="range" min="20" max="80" step="1" value="20" />
+        <label for="light-brightness">Light brightness: <span id="light-brightness-value">100%</span></label>
+        <input id="light-brightness" type="range" min="0.5" max="5" step="0.01" value="1" />
+        <label for="cloud-spin">Cloud spin: <span id="cloud-spin-value">0.12</span></label>
+        <input id="cloud-spin" type="range" min="0" max="0.5" step="0.01" value="0.12" />
+        <label for="cloud-elevation">Cloud elevation: <span id="cloud-elevation-value">30</span></label>
+        <input id="cloud-elevation" type="range" min="4" max="100" step="1" value="30" />
+        <label for="cloud-terrain-influence">Elevation change %: <span id="cloud-terrain-influence-value">50%</span></label>
+        <input id="cloud-terrain-influence" type="range" min="0" max="1" step="0.01" value="0.5" />
+        <label for="cloud-min-sphere-ratio">Min sphere ratio: <span id="cloud-min-sphere-ratio-value">0.11</span></label>
+        <input id="cloud-min-sphere-ratio" type="range" min="0.04" max="0.3" step="0.01" value="0.11" />
+        <label for="cloud-min-sphere-clamp">Min sphere clamp: <span id="cloud-min-sphere-clamp-value">0.12</span></label>
+        <input id="cloud-min-sphere-clamp" type="range" min="0.05" max="0.5" step="0.01" value="0.12" />
+        <label for="cloud-radius-factor">Cloud radius factor: <span id="cloud-radius-factor-value">3.20</span></label>
+        <input id="cloud-radius-factor" type="range" min="1" max="6" step="0.05" value="3.2" />
+        <label for="cloud-x-ratio">Cloud X proportion: <span id="cloud-x-ratio-value">1.00</span></label>
+        <input id="cloud-x-ratio" type="range" min="0.4" max="2" step="0.01" value="1" />
+        <label for="cloud-y-ratio">Cloud Y proportion: <span id="cloud-y-ratio-value">0.60</span></label>
+        <input id="cloud-y-ratio" type="range" min="0.2" max="1.5" step="0.01" value="0.6" />
+        <label for="cloud-z-ratio">Cloud Z proportion: <span id="cloud-z-ratio-value">1.00</span></label>
+        <input id="cloud-z-ratio" type="range" min="0.4" max="2" step="0.01" value="1" />
+        <label for="rain-area-ratio">Rain area ratio: <span id="rain-area-ratio-value">1.00</span></label>
+        <input id="rain-area-ratio" type="range" min="0.2" max="1.5" step="0.01" value="1" />
+        <label for="particle-size-ratio">Particle size ratio: <span id="particle-size-ratio-value">0.25</span></label>
+        <input id="particle-size-ratio" type="range" min="0.05" max="1" step="0.01" value="0.25" />
+      </div>
+    </details>
+
+    <script type="module">
+      import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js';
+
+      const CONFIG = {
+        seed: 1337,
+        chunkSize: 30,
+        tileSize: 2,
+        loadRadius: 4,
+        unloadRadius: 6,
+        waterLevel: 2.2,
+        moveSpeed: 17,
+        mountainRainHeight: 10.5,
+        minCloudScale: 0.82,
+        maxCloudScale: 2.45,
+        minCloudWaterClearance: 3.8,
+        cloudSpinSpeed: 0.12,
+        sunIntensity: 1.28,
+        sunIntensityScale: 1,
+        maxCloudScreenFraction: 0.25,
+        viewAngleDeg: 20,
+        cloudBaseElevation: 30,
+        cloudTerrainInfluence: 0.5,
+        cloudRadiusFactor: 3.2,
+        minSphereRatio: 0.11,
+        minSphereClamp: 0.12,
+        cloudXRatio: 1.0,
+        cloudYRatio: 0.6,
+        cloudZRatio: 1.0,
+        rainFallDepth: 220,
+        rainAreaRatio: 1.0,
+        particleSizeRatio: 0.25,
+        rainDuration: 5,
+        flowerLifetime: 60,
+      };
+
+      const scene = new THREE.Scene();
+      scene.fog = new THREE.Fog(0xd4ebff, 150, 460);
+
+      const frustumSize = 58;
+      const camera = new THREE.OrthographicCamera();
+      const updateCameraProjection = () => {
+        const aspect = window.innerWidth / window.innerHeight;
+        camera.left = (-frustumSize * aspect) / 2;
+        camera.right = (frustumSize * aspect) / 2;
+        camera.top = frustumSize / 2;
+        camera.bottom = -frustumSize / 2;
+        camera.near = -500;
+        camera.far = 1200;
+        camera.updateProjectionMatrix();
+      };
+      updateCameraProjection();
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.6));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      document.body.appendChild(renderer.domElement);
+
+      scene.add(new THREE.HemisphereLight(0xd8eeff, 0x54784e, 0.52));
+      const sun = new THREE.DirectionalLight(0xffffff, CONFIG.sunIntensity);
+      sun.castShadow = true;
+      sun.shadow.mapSize.set(2048, 2048);
+      sun.shadow.camera.left = -180;
+      sun.shadow.camera.right = 180;
+      sun.shadow.camera.top = 180;
+      sun.shadow.camera.bottom = -180;
+      sun.shadow.camera.near = 20;
+      sun.shadow.camera.far = 520;
+      scene.add(sun);
+      scene.add(sun.target);
+
+      const terrainMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.98 });
+      const waterMaterial = new THREE.MeshStandardMaterial({ color: 0x9bdcff, roughness: 0.1, metalness: 0.05, transparent: true, opacity: 0.62 });
+      const crownGeom = new THREE.ConeGeometry(0.68, 1.45, 6);
+      const crownMat = new THREE.MeshStandardMaterial({ color: 0x2f8f4a, flatShading: true });
+
+      function hashRand(a, b) {
+        const n = Math.sin(a * 129.91 + b * 217.37 + CONFIG.seed * 0.1) * 43758.5453123;
+        return n - Math.floor(n);
+      }
+      function hash2(x, z, seed) {
+        const s = Math.sin(x * 127.1 + z * 311.7 + seed * 71.1) * 43758.5453123;
+        return s - Math.floor(s);
+      }
+      function valueNoise2(x, z, seed) {
+        const x0 = Math.floor(x);
+        const z0 = Math.floor(z);
+        const fx = x - x0;
+        const fz = z - z0;
+        const fade = (t) => t * t * (3 - 2 * t);
+        const a = hash2(x0, z0, seed);
+        const b = hash2(x0 + 1, z0, seed);
+        const c = hash2(x0, z0 + 1, seed);
+        const d = hash2(x0 + 1, z0 + 1, seed);
+        const ix1 = a + (b - a) * fade(fx);
+        const ix2 = c + (d - c) * fade(fx);
+        return ix1 + (ix2 - ix1) * fade(fz);
+      }
+
+      function getHeight(wx, wz) {
+        const nContinent = valueNoise2(wx * 0.0045, wz * 0.0045, CONFIG.seed) * 1.2;
+        const nMacro = valueNoise2(wx * 0.011, wz * 0.011, CONFIG.seed + 11) * 8.2;
+        const nRidge = Math.abs(valueNoise2(wx * 0.026, wz * 0.026, CONFIG.seed + 53) - 0.5) * 17.5;
+        const nDetail = valueNoise2(wx * 0.08, wz * 0.08, CONFIG.seed + 91) * 1.8;
+        const nPeakNoise = valueNoise2(wx * 0.006, wz * 0.006, CONFIG.seed + 701);
+        const rarePeaks = Math.pow(Math.max(0, nPeakNoise - 0.82), 2.2) * 170;
+        const oceanMask = (nContinent - 0.55) * 16;
+        return oceanMask + nMacro + nRidge + nDetail + rarePeaks - 7.5;
+      }
+
+      function terrainColor(h) {
+        const sand = new THREE.Color(0xceb889);
+        const grassLow = new THREE.Color(0x66bb62);
+        const grassHigh = new THREE.Color(0x4f9e58);
+        const rock = new THREE.Color(0x70806b);
+        const snow = new THREE.Color(0xf4f8ff);
+        const smoothMix = (a, b, x0, x1, x) => a.clone().lerp(b, THREE.MathUtils.smoothstep(x, x0, x1));
+        if (h < CONFIG.waterLevel + 0.5) return smoothMix(sand, grassLow, CONFIG.waterLevel - 0.4, CONFIG.waterLevel + 0.5, h);
+        if (h < 7.2) return smoothMix(grassLow, grassHigh, 2.5, 7.2, h);
+        if (h < 16.2) return smoothMix(grassHigh, rock, 8.8, 16.2, h);
+        if (h < 28) return smoothMix(rock, new THREE.Color(0x95a18f), 16.0, 28.0, h);
+        return smoothMix(new THREE.Color(0x95a18f), snow, 26.0, 42.0, h);
+      }
+
+      function key(cx, cz) { return `${cx},${cz}`; }
+      const chunks = new Map();
+      const chunkRoot = new THREE.Group();
+      scene.add(chunkRoot);
+      const tempObj = new THREE.Object3D();
+
+      function buildChunk(cx, cz) {
+        const size = CONFIG.chunkSize * CONFIG.tileSize;
+        const seg = CONFIG.chunkSize;
+        const group = new THREE.Group();
+        const geom = new THREE.PlaneGeometry(size, size, seg, seg);
+        geom.rotateX(-Math.PI / 2);
+        const pos = geom.attributes.position;
+        const colors = new Float32Array(pos.count * 3);
+        for (let i = 0; i < pos.count; i++) {
+          const lx = pos.getX(i);
+          const lz = pos.getZ(i);
+          const wx = cx * size + lx;
+          const wz = cz * size + lz;
+          const h = getHeight(wx, wz);
+          pos.setY(i, h);
+          const c = terrainColor(h);
+          colors[i * 3] = c.r;
+          colors[i * 3 + 1] = c.g;
+          colors[i * 3 + 2] = c.b;
+        }
+        geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        geom.computeVertexNormals();
+
+        const terrain = new THREE.Mesh(geom, terrainMaterial);
+        terrain.position.set(cx * size, 0, cz * size);
+        terrain.receiveShadow = true;
+        group.add(terrain);
+
+        const water = new THREE.Mesh(new THREE.PlaneGeometry(size, size, 1, 1), waterMaterial);
+        water.rotation.x = -Math.PI / 2;
+        water.position.set(cx * size, CONFIG.waterLevel, cz * size);
+        water.receiveShadow = true;
+        group.add(water);
+
+        const clumpCount = 2 + Math.floor(hash2(cx, cz, CONFIG.seed + 199) * 3);
+        const maxCrowns = 54;
+        const crowns = new THREE.InstancedMesh(crownGeom, crownMat, maxCrowns);
+        crowns.castShadow = true;
+        crowns.receiveShadow = true;
+
+        let count = 0;
+        for (let c = 0; c < clumpCount; c++) {
+          const centerX = (hash2(cx + c * 4.2, cz + 1.3, CONFIG.seed + 401) - 0.5) * size;
+          const centerZ = (hash2(cx + c * 3.1, cz + 7.4, CONFIG.seed + 402) - 0.5) * size;
+          const inClump = 10 + Math.floor(hash2(c + cx * 0.7, cz, CONFIG.seed + 405) * 11);
+          for (let i = 0; i < inClump && count < maxCrowns; i++) {
+            const r = Math.sqrt(hash2(i + c * 12.7, cx * 1.7, CONFIG.seed + 460)) * (2.3 + hash2(i, cz, CONFIG.seed + 461) * 4.2);
+            const a = hash2(i + c * 7.1, cz * 1.9, CONFIG.seed + 462) * Math.PI * 2;
+            const tx = centerX + Math.cos(a) * r;
+            const tz = centerZ + Math.sin(a) * r;
+            if (Math.abs(tx) > size * 0.5 || Math.abs(tz) > size * 0.5) continue;
+            const wx = cx * size + tx;
+            const wz = cz * size + tz;
+            const h = getHeight(wx, wz);
+            if (h < CONFIG.waterLevel + 0.75 || h > 13.8) continue;
+            const scale = 0.9 + hash2(i + c * 2.3, cx * 13 + cz, CONFIG.seed + 463) * 1.45;
+            tempObj.position.set(wx, h + 1.05 * scale, wz);
+            tempObj.rotation.y = hash2(i, cz + c * 8.3, CONFIG.seed + 470) * Math.PI;
+            tempObj.scale.setScalar(scale);
+            tempObj.updateMatrix();
+            crowns.setMatrixAt(count, tempObj.matrix);
+            count++;
+          }
+        }
+        crowns.count = count;
+        if (count > 0) {
+          crowns.instanceMatrix.needsUpdate = true;
+          group.add(crowns);
+        }
+
+        chunkRoot.add(group);
+        chunks.set(key(cx, cz), group);
+      }
+
+      function updateChunks(px, pz) {
+        const size = CONFIG.chunkSize * CONFIG.tileSize;
+        const centerX = Math.round(px / size);
+        const centerZ = Math.round(pz / size);
+        const keep = new Set();
+        for (let dz = -CONFIG.loadRadius; dz <= CONFIG.loadRadius; dz++) {
+          for (let dx = -CONFIG.loadRadius; dx <= CONFIG.loadRadius; dx++) {
+            const cx = centerX + dx;
+            const cz = centerZ + dz;
+            const k = key(cx, cz);
+            keep.add(k);
+            if (!chunks.has(k)) buildChunk(cx, cz);
+          }
+        }
+        for (const [k, grp] of chunks) {
+          const [cx, cz] = k.split(',').map(Number);
+          const tooFar = Math.abs(cx - centerX) > CONFIG.unloadRadius || Math.abs(cz - centerZ) > CONFIG.unloadRadius;
+          if (tooFar && !keep.has(k)) {
+            chunkRoot.remove(grp);
+            grp.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+            chunks.delete(k);
+          }
+        }
+      }
+
+      const cloud = new THREE.Group();
+      const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 0.78, metalness: 0.0 });
+      const cloudSpheres = [];
+      for (let i = 0; i < 84; i++) {
+        const seedX = hashRand(i * 1.1 + 5.7, 0.0) * 2 - 1;
+        const seedY = hashRand(i * 2.3 + 8.4, 1.0) * 2 - 1;
+        const seedZ = hashRand(i * 3.7 + 2.2, 2.0) * 2 - 1;
+        const radialBias = Math.pow(hashRand(i * 5.2, 9.1), 2.4);
+        const off = new THREE.Vector3(seedX * CONFIG.cloudXRatio, seedY * CONFIG.cloudYRatio, seedZ * CONFIG.cloudZRatio).normalize().multiplyScalar(0.35 + radialBias * 3.6);
+        const baseSize = 0.42 + hashRand(i * 4.9, 4.0) * 1.05;
+        const sphere = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 0), cloudMat); // 20-sided sphere
+        sphere.castShadow = true;
+        sphere.rotation.set(hashRand(i, 101) * Math.PI * 2, hashRand(i, 202) * Math.PI * 2, hashRand(i, 303) * Math.PI * 2);
+        cloud.add(sphere);
+        const baseSpin = 0.7 + hashRand(i * 7.7, 11.1) * 0.9;
+        cloudSpheres.push({ offset: off, baseSize, phase: i * 0.133, mesh: sphere, baseSpin });
+      }
+      scene.add(cloud);
+
+      const vaporCount = 180;
+      const vaporGeom = new THREE.BufferGeometry();
+      const vaporPos = new Float32Array(vaporCount * 3);
+      const vaporVel = new Float32Array(vaporCount);
+      for (let i = 0; i < vaporCount; i++) {
+        vaporPos[i * 3] = (Math.random() - 0.5) * 2.0 * CONFIG.rainAreaRatio;
+        vaporPos[i * 3 + 1] = -Math.random() * CONFIG.rainFallDepth;
+        vaporPos[i * 3 + 2] = (Math.random() - 0.5) * 2.0 * CONFIG.rainAreaRatio;
+        vaporVel[i] = 1.1 + Math.random() * 1.3;
+      }
+      vaporGeom.setAttribute('position', new THREE.BufferAttribute(vaporPos, 3));
+      const vaporMat = new THREE.PointsMaterial({ color: 0xc8f3ff, size: 0.36, transparent: false, opacity: 1.0, sizeAttenuation: false, depthWrite: false });
+      const vapor = new THREE.Points(vaporGeom, vaporMat);
+      vapor.visible = false;
+      cloud.add(vapor);
+
+      const rainCount = 560;
+      const rainGeom = new THREE.BufferGeometry();
+      const rainPos = new Float32Array(rainCount * 3);
+      const rainVel = new Float32Array(rainCount);
+      for (let i = 0; i < rainCount; i++) {
+        rainPos[i * 3] = (Math.random() - 0.5) * 2.0 * CONFIG.rainAreaRatio;
+        rainPos[i * 3 + 1] = -Math.random() * CONFIG.rainFallDepth;
+        rainPos[i * 3 + 2] = (Math.random() - 0.5) * 2.0 * CONFIG.rainAreaRatio;
+        rainVel[i] = 2.4 + Math.random() * 1.8;
+      }
+      rainGeom.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
+      const rainMat = new THREE.PointsMaterial({ color: 0xc8f3ff, size: 0.34, transparent: false, opacity: 1.0, sizeAttenuation: false, depthWrite: false });
+      const rain = new THREE.Points(rainGeom, rainMat);
+      rain.visible = false;
+      cloud.add(rain);
+
+      const flowerGroup = new THREE.Group();
+      const flowerGeom = new THREE.DodecahedronGeometry(0.28, 0);
+      const flowerMats = [0xff79c6, 0xffd166, 0xff6b6b, 0xbaffc9, 0xcdb4ff].map((c) => new THREE.MeshStandardMaterial({ color: c, flatShading: true }));
+      const flowers = [];
+      const flowerRadiusSq = 1.3 * 1.3;
+      scene.add(flowerGroup);
+
+      const keyState = new Set();
+      window.addEventListener('keydown', (e) => keyState.add(e.key.toLowerCase()));
+      window.addEventListener('keyup', (e) => keyState.delete(e.key.toLowerCase()));
+
+      const raycaster = new THREE.Raycaster();
+      const pointer = new THREE.Vector2();
+      const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+      const clickMoveTarget = new THREE.Vector3();
+      let hasClickTarget = false;
+
+      const settingsMenu = document.getElementById('settings');
+      let isPaused = false;
+      settingsMenu.addEventListener('toggle', () => { isPaused = settingsMenu.open; });
+
+      const player = {
+        pos: new THREE.Vector3(0, getHeight(0, 0) + 10, 0),
+        vel: new THREE.Vector3(),
+        waterContent: 0.0,
+        storminess: 0,
+        raining: false,
+        rainTimer: 0,
+      };
+
+      function updateCameraAndLight() {
+        const az = Math.PI / 4;
+        const el = THREE.MathUtils.degToRad(CONFIG.viewAngleDeg);
+        const dist = 86;
+        const offset = new THREE.Vector3(Math.cos(el) * Math.cos(az) * dist, Math.sin(el) * dist, Math.cos(el) * Math.sin(az) * dist);
+        camera.position.copy(player.pos).add(offset);
+        camera.lookAt(player.pos);
+        sun.position.set(player.pos.x, player.pos.y + 170, player.pos.z);
+        sun.target.position.copy(player.pos);
+        sun.target.updateMatrixWorld();
+      }
+
+      function renderNow() {
+        updateCameraAndLight();
+        renderer.render(scene, camera);
+      }
+
+      const bindRange = (id, configKey, formatter = (v) => v, onChange) => {
+        const input = document.getElementById(id);
+        const value = document.getElementById(`${id}-value`);
+        const apply = () => {
+          const num = Number(input.value);
+          CONFIG[configKey] = num;
+          value.textContent = formatter(num);
+          if (onChange) onChange(num);
+        };
+        input.addEventListener('input', apply);
+        apply();
+      };
+
+      bindRange('view-angle', 'viewAngleDeg', (v) => `${Math.round(v)}°`, () => renderNow());
+      bindRange('cloud-spin', 'cloudSpinSpeed', (v) => v.toFixed(2));
+      bindRange('light-brightness', 'sunIntensityScale', (v) => `${Math.round(v * 100)}%`, (v) => {
+        sun.intensity = CONFIG.sunIntensity * v;
+        renderNow();
+      });
+      bindRange('cloud-elevation', 'cloudBaseElevation', (v) => v.toFixed(0));
+      bindRange('cloud-terrain-influence', 'cloudTerrainInfluence', (v) => `${Math.round(v * 100)}%`);
+      bindRange('cloud-min-sphere-ratio', 'minSphereRatio', (v) => v.toFixed(2));
+      bindRange('cloud-min-sphere-clamp', 'minSphereClamp', (v) => v.toFixed(2));
+      bindRange('cloud-radius-factor', 'cloudRadiusFactor', (v) => v.toFixed(2));
+      bindRange('cloud-x-ratio', 'cloudXRatio', (v) => v.toFixed(2));
+      bindRange('cloud-y-ratio', 'cloudYRatio', (v) => v.toFixed(2));
+      bindRange('cloud-z-ratio', 'cloudZRatio', (v) => v.toFixed(2));
+      bindRange('rain-area-ratio', 'rainAreaRatio', (v) => v.toFixed(2));
+      bindRange('particle-size-ratio', 'particleSizeRatio', (v) => v.toFixed(2));
+
+      function pointerToGround(clientX, clientY) {
+        const rect = renderer.domElement.getBoundingClientRect();
+        pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+        pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(pointer, camera);
+        const out = new THREE.Vector3();
+        if (raycaster.ray.intersectPlane(groundPlane, out)) {
+          clickMoveTarget.copy(out);
+          hasClickTarget = true;
+        }
+      }
+      window.addEventListener('pointerdown', (e) => pointerToGround(e.clientX, e.clientY), { passive: true });
+      window.addEventListener('pointermove', (e) => { if (e.buttons === 1) pointerToGround(e.clientX, e.clientY); }, { passive: true });
+
+      function maybeGrowFlowers(dt, cloudRadius) {
+        const spawnCount = Math.floor(dt * 16);
+        for (let i = 0; i < spawnCount; i++) {
+          if (flowers.length > 700) break;
+          const fx = player.pos.x + (Math.random() - 0.5) * cloudRadius * 1.6;
+          const fz = player.pos.z + (Math.random() - 0.5) * cloudRadius * 1.6;
+          const fh = getHeight(fx, fz);
+          if (fh < CONFIG.waterLevel + 0.5 || fh > 11.0) continue;
+          let tooClose = false;
+          for (let j = flowers.length - 1; j >= Math.max(0, flowers.length - 60); j--) {
+            const o = flowers[j];
+            const dx = o.mesh.position.x - fx;
+            const dz = o.mesh.position.z - fz;
+            if (dx * dx + dz * dz < flowerRadiusSq) { tooClose = true; break; }
+          }
+          if (tooClose) continue;
+          const mat = flowerMats[Math.floor(Math.random() * flowerMats.length)];
+          const mesh = new THREE.Mesh(flowerGeom, mat);
+          mesh.castShadow = false;
+          mesh.receiveShadow = true;
+          const s = 0.8 + Math.random() * 0.9;
+          mesh.scale.setScalar(s);
+          mesh.position.set(fx, fh + 0.25, fz);
+          flowerGroup.add(mesh);
+          flowers.push({ mesh, expiresAt: time + CONFIG.flowerLifetime });
+        }
+      }
+
+      function pruneFlowers() {
+        for (let i = flowers.length - 1; i >= 0; i--) {
+          if (flowers[i].expiresAt <= time) {
+            flowerGroup.remove(flowers[i].mesh);
+            flowers.splice(i, 1);
+          }
+        }
+      }
+
+      window.__cloudDebug = { player, CONFIG, setRain(on) { player.raining = !!on; player.rainTimer = on ? CONFIG.rainDuration : 0; } };
+
+      let time = 0;
+      let last = performance.now();
+      function animate(now) {
+        const dt = Math.min((now - last) / 1000, 0.05);
+        last = now;
+        if (isPaused) {
+          renderNow();
+          requestAnimationFrame(animate);
+          return;
+        }
+        time += dt;
+
+        const input = new THREE.Vector2();
+        if (keyState.has('arrowup') || keyState.has('w')) input.y -= 1;
+        if (keyState.has('arrowdown') || keyState.has('s')) input.y += 1;
+        if (keyState.has('arrowleft') || keyState.has('a')) input.x -= 1;
+        if (keyState.has('arrowright') || keyState.has('d')) input.x += 1;
+
+        if (input.lengthSq() > 0) {
+          hasClickTarget = false;
+          input.normalize();
+          player.vel.set(input.x * CONFIG.moveSpeed, 0, input.y * CONFIG.moveSpeed);
+        } else if (hasClickTarget) {
+          const to = clickMoveTarget.clone().sub(player.pos);
+          to.y = 0;
+          const dist = to.length();
+          if (dist < 1.2) {
+            hasClickTarget = false;
+            player.vel.set(0, 0, 0);
+          } else {
+            to.normalize();
+            player.vel.set(to.x * CONFIG.moveSpeed, 0, to.z * CONFIG.moveSpeed);
+          }
+        } else {
+          player.vel.multiplyScalar(Math.max(0, 1 - dt * 8));
+        }
+
+        player.pos.x += player.vel.x * dt;
+        player.pos.z += player.vel.z * dt;
+
+        const ground = getHeight(player.pos.x, player.pos.z);
+        const overWater = ground <= CONFIG.waterLevel + 0.2;
+        const high = ground >= CONFIG.mountainRainHeight;
+
+        if (overWater) player.waterContent = Math.min(1, player.waterContent + dt * 0.16);
+        if (high || player.raining) player.waterContent = Math.max(0, player.waterContent - dt * 0.066);
+
+        player.storminess += ((high ? 1 : 0) - player.storminess) * Math.min(1, dt * (high ? 0.6 : 0.47));
+
+        if (!player.raining && player.storminess > 0.62 && player.waterContent > 0.2) {
+          player.raining = true;
+          player.rainTimer = CONFIG.rainDuration;
+        }
+        if (player.raining) {
+          player.rainTimer -= dt;
+          if (player.rainTimer <= 0) {
+            player.raining = false;
+          }
+        }
+
+        const cloudScale = THREE.MathUtils.lerp(CONFIG.minCloudScale, CONFIG.maxCloudScale, player.waterContent);
+        const aspect = window.innerWidth / window.innerHeight;
+        const maxCloudRadius = Math.min(frustumSize * aspect, frustumSize) * CONFIG.maxCloudScreenFraction * 0.5;
+        const cloudRadius = Math.min(maxCloudRadius, CONFIG.cloudRadiusFactor * cloudScale);
+        const minSphereSize = cloudRadius * CONFIG.minSphereRatio;
+        const particleSize = Math.max(CONFIG.minSphereClamp, minSphereSize * CONFIG.particleSizeRatio);
+        vaporMat.size = particleSize;
+        rainMat.size = particleSize;
+
+        const darken = Math.min(1, (player.raining ? 1 : player.storminess) * 1.2);
+        const lit = THREE.MathUtils.lerp(1.0, 0.34, darken);
+        cloudMat.color.setRGB(lit, lit, lit);
+
+        vapor.visible = overWater;
+        vaporMat.opacity = 1.0;
+        const vapAttr = vapor.geometry.attributes.position;
+        for (let i = 0; i < vaporCount; i++) {
+          vapAttr.array[i * 3 + 1] -= vaporVel[i] * dt;
+          vapAttr.array[i * 3] += Math.sin(time * 1.4 + i) * 0.006;
+          if (vapAttr.array[i * 3 + 1] < -CONFIG.rainFallDepth) {
+            vapAttr.array[i * 3] = (Math.random() - 0.5) * cloudRadius * 2.0 * CONFIG.rainAreaRatio;
+            vapAttr.array[i * 3 + 1] = 0;
+            vapAttr.array[i * 3 + 2] = (Math.random() - 0.5) * cloudRadius * 2.0 * CONFIG.rainAreaRatio;
+          }
+        }
+        vapAttr.needsUpdate = true;
+
+        rain.visible = player.raining;
+        if (player.raining) {
+          const attr = rain.geometry.attributes.position;
+          for (let i = 0; i < rainCount; i++) {
+            attr.array[i * 3 + 1] -= rainVel[i] * dt;
+            if (attr.array[i * 3 + 1] < -CONFIG.rainFallDepth) {
+              attr.array[i * 3] = (Math.random() - 0.5) * cloudRadius * 2.0 * CONFIG.rainAreaRatio;
+              attr.array[i * 3 + 1] = 0;
+              attr.array[i * 3 + 2] = (Math.random() - 0.5) * cloudRadius * 2.0 * CONFIG.rainAreaRatio;
+            }
+          }
+          attr.needsUpdate = true;
+          maybeGrowFlowers(dt, cloudRadius);
+        }
+        pruneFlowers();
+
+        const minYAboveWater = CONFIG.waterLevel + CONFIG.minCloudWaterClearance + cloudRadius * 0.6;
+        const terrainAdjustedElevation = CONFIG.cloudBaseElevation + ground * CONFIG.cloudTerrainInfluence;
+        const floatY = Math.max(minYAboveWater, terrainAdjustedElevation + Math.sin(time * 2.2) * 0.26);
+        player.pos.y += (floatY - player.pos.y) * Math.min(1, dt * 4.6);
+        player.pos.y = Math.max(player.pos.y, minYAboveWater);
+
+        const worldX = player.pos.x;
+        const worldZ = player.pos.z;
+        const radiusBias = THREE.MathUtils.lerp(-0.1, 0.26, player.waterContent);
+        cloudSpheres.forEach((entry, i) => {
+          const sx = (worldX + entry.offset.x * 4.4) * 0.1;
+          const sz = (worldZ + entry.offset.z * 4.4) * 0.1;
+          const field = valueNoise2(sx, sz, CONFIG.seed + 700 + (i % 3) * 31);
+          const life = THREE.MathUtils.smoothstep(field + radiusBias, 0.36, 0.9);
+          const pulse = 0.78 + Math.sin(time * 2.1 + entry.phase * 10) * 0.22;
+          const centerWeight = Math.max(0.22, 1 - entry.offset.length() / 3.8);
+          const dynamicSize = entry.baseSize * life * pulse * (0.95 + centerWeight * 1.45);
+          const minSize = minSphereSize * (0.62 + centerWeight * 0.4);
+          const s = Math.max(minSize, dynamicSize);
+          const local = entry.offset.clone().normalize().multiply(new THREE.Vector3(CONFIG.cloudXRatio, CONFIG.cloudYRatio, CONFIG.cloudZRatio)).setLength(0.2 + life * cloudRadius * (0.5 + centerWeight * 0.9));
+          entry.mesh.visible = s > 0.06;
+          entry.mesh.position.copy(local);
+          entry.mesh.scale.setScalar(Math.max(0.001, s));
+          const spin = (entry.baseSpin / (0.2 + s)) * dt;
+          entry.mesh.rotation.x += spin * 0.55;
+          entry.mesh.rotation.y += spin;
+        });
+
+        cloud.position.copy(player.pos);
+        cloud.rotation.y += dt * CONFIG.cloudSpinSpeed;
+
+        updateCameraAndLight();
+        updateChunks(player.pos.x, player.pos.z);
+        renderer.render(scene, camera);
+        requestAnimationFrame(animate);
+      }
+
+      updateChunks(0, 0);
+      renderNow();
+      requestAnimationFrame((t0) => { last = t0; animate(t0); });
+
+      window.addEventListener('resize', () => {
+        updateCameraProjection();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderNow();
+      });
+    </script>
+  </body>
+</html>
