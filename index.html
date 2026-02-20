@@ -25,7 +25,7 @@
         background: rgb(10 30 52 / 72%);
         border-radius: 10px;
         border: 1px solid rgb(189 232 255 / 35%);
-        min-width: 190px;
+        width: fit-content;
       }
 
       #settings summary {
@@ -43,6 +43,9 @@
       #settings-panel {
         padding: 0 10px 10px;
         font-size: 0.85rem;
+        width: min(380px, 92vw);
+        max-height: 82vh;
+        overflow: auto;
       }
 
       #settings-panel label {
@@ -61,12 +64,26 @@
       <div id="settings-panel">
         <label for="view-angle">View angle: <span id="view-angle-value">20°</span></label>
         <input id="view-angle" type="range" min="20" max="80" step="1" value="20" />
-        <label for="cloud-spin">Cloud spin: <span id="cloud-spin-value">0.12</span></label>
-        <input id="cloud-spin" type="range" min="0" max="0.5" step="0.01" value="0.12" />
         <label for="light-brightness">Light brightness: <span id="light-brightness-value">100%</span></label>
         <input id="light-brightness" type="range" min="0.5" max="5" step="0.01" value="1" />
+        <label for="cloud-spin">Cloud spin: <span id="cloud-spin-value">0.12</span></label>
+        <input id="cloud-spin" type="range" min="0" max="0.5" step="0.01" value="0.12" />
         <label for="cloud-elevation">Cloud elevation: <span id="cloud-elevation-value">30</span></label>
         <input id="cloud-elevation" type="range" min="4" max="100" step="1" value="30" />
+        <label for="cloud-terrain-influence">Elevation change %: <span id="cloud-terrain-influence-value">50%</span></label>
+        <input id="cloud-terrain-influence" type="range" min="0" max="1" step="0.01" value="0.5" />
+        <label for="cloud-min-sphere-ratio">Min sphere ratio: <span id="cloud-min-sphere-ratio-value">0.11</span></label>
+        <input id="cloud-min-sphere-ratio" type="range" min="0.04" max="0.3" step="0.01" value="0.11" />
+        <label for="cloud-min-sphere-clamp">Min sphere clamp: <span id="cloud-min-sphere-clamp-value">0.12</span></label>
+        <input id="cloud-min-sphere-clamp" type="range" min="0.05" max="0.5" step="0.01" value="0.12" />
+        <label for="cloud-radius-factor">Cloud radius factor: <span id="cloud-radius-factor-value">3.20</span></label>
+        <input id="cloud-radius-factor" type="range" min="1" max="6" step="0.05" value="3.2" />
+        <label for="cloud-x-ratio">Cloud X proportion: <span id="cloud-x-ratio-value">1.00</span></label>
+        <input id="cloud-x-ratio" type="range" min="0.4" max="2" step="0.01" value="1" />
+        <label for="cloud-y-ratio">Cloud Y proportion: <span id="cloud-y-ratio-value">0.60</span></label>
+        <input id="cloud-y-ratio" type="range" min="0.2" max="1.5" step="0.01" value="0.6" />
+        <label for="cloud-z-ratio">Cloud Z proportion: <span id="cloud-z-ratio-value">1.00</span></label>
+        <input id="cloud-z-ratio" type="range" min="0.4" max="2" step="0.01" value="1" />
       </div>
     </details>
 
@@ -87,9 +104,18 @@
         minCloudWaterClearance: 3.8,
         cloudSpinSpeed: 0.12,
         sunIntensity: 1.28,
+        sunIntensityScale: 1,
         maxCloudScreenFraction: 0.25,
         viewAngleDeg: 20,
         cloudBaseElevation: 30,
+        cloudTerrainInfluence: 0.5,
+        cloudRadiusFactor: 3.2,
+        minSphereRatio: 0.11,
+        minSphereClamp: 0.12,
+        cloudXRatio: 1.0,
+        cloudYRatio: 0.6,
+        cloudZRatio: 1.0,
+        rainFallDepth: 220,
         rainDuration: 5,
         flowerLifetime: 60,
       };
@@ -297,7 +323,7 @@
         const seedY = hashRand(i * 2.3 + 8.4, 1.0) * 2 - 1;
         const seedZ = hashRand(i * 3.7 + 2.2, 2.0) * 2 - 1;
         const radialBias = Math.pow(hashRand(i * 5.2, 9.1), 2.4);
-        const off = new THREE.Vector3(seedX, seedY * 0.6, seedZ).normalize().multiplyScalar(0.35 + radialBias * 3.6);
+        const off = new THREE.Vector3(seedX * CONFIG.cloudXRatio, seedY * CONFIG.cloudYRatio, seedZ * CONFIG.cloudZRatio).normalize().multiplyScalar(0.35 + radialBias * 3.6);
         const baseSize = 0.42 + hashRand(i * 4.9, 4.0) * 1.05;
         const sphere = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 0), cloudMat); // 20-sided sphere
         sphere.castShadow = true;
@@ -314,7 +340,7 @@
       const vaporVel = new Float32Array(vaporCount);
       for (let i = 0; i < vaporCount; i++) {
         vaporPos[i * 3] = (Math.random() - 0.5) * 2.2;
-        vaporPos[i * 3 + 1] = -1.7 - Math.random() * 1.1;
+        vaporPos[i * 3 + 1] = -Math.random() * CONFIG.rainFallDepth;
         vaporPos[i * 3 + 2] = (Math.random() - 0.5) * 2.2;
         vaporVel[i] = 1.1 + Math.random() * 1.3;
       }
@@ -330,7 +356,7 @@
       const rainVel = new Float32Array(rainCount);
       for (let i = 0; i < rainCount; i++) {
         rainPos[i * 3] = (Math.random() - 0.5) * 3.2;
-        rainPos[i * 3 + 1] = -Math.random() * 4.2;
+        rainPos[i * 3 + 1] = -Math.random() * CONFIG.rainFallDepth;
         rainPos[i * 3 + 2] = (Math.random() - 0.5) * 3.2;
         rainVel[i] = 2.4 + Math.random() * 1.8;
       }
@@ -387,36 +413,33 @@
         renderer.render(scene, camera);
       }
 
-      const viewAngleInput = document.getElementById('view-angle');
-      const viewAngleValue = document.getElementById('view-angle-value');
-      viewAngleInput.addEventListener('input', () => {
-        CONFIG.viewAngleDeg = Number(viewAngleInput.value);
-        viewAngleValue.textContent = `${CONFIG.viewAngleDeg}°`;
+      const bindRange = (id, configKey, formatter = (v) => v, onChange) => {
+        const input = document.getElementById(id);
+        const value = document.getElementById(`${id}-value`);
+        const apply = () => {
+          const num = Number(input.value);
+          CONFIG[configKey] = num;
+          value.textContent = formatter(num);
+          if (onChange) onChange(num);
+        };
+        input.addEventListener('input', apply);
+        apply();
+      };
+
+      bindRange('view-angle', 'viewAngleDeg', (v) => `${Math.round(v)}°`, () => renderNow());
+      bindRange('cloud-spin', 'cloudSpinSpeed', (v) => v.toFixed(2));
+      bindRange('light-brightness', 'sunIntensityScale', (v) => `${Math.round(v * 100)}%`, (v) => {
+        sun.intensity = CONFIG.sunIntensity * v;
         renderNow();
       });
-
-      const cloudSpinInput = document.getElementById('cloud-spin');
-      const cloudSpinValue = document.getElementById('cloud-spin-value');
-      cloudSpinInput.addEventListener('input', () => {
-        CONFIG.cloudSpinSpeed = Number(cloudSpinInput.value);
-        cloudSpinValue.textContent = CONFIG.cloudSpinSpeed.toFixed(2);
-      });
-
-      const lightBrightnessInput = document.getElementById('light-brightness');
-      const lightBrightnessValue = document.getElementById('light-brightness-value');
-      lightBrightnessInput.addEventListener('input', () => {
-        const brightness = Number(lightBrightnessInput.value);
-        sun.intensity = CONFIG.sunIntensity * brightness;
-        lightBrightnessValue.textContent = `${Math.round(brightness * 100)}%`;
-        renderNow();
-      });
-
-      const cloudElevationInput = document.getElementById('cloud-elevation');
-      const cloudElevationValue = document.getElementById('cloud-elevation-value');
-      cloudElevationInput.addEventListener('input', () => {
-        CONFIG.cloudBaseElevation = Number(cloudElevationInput.value);
-        cloudElevationValue.textContent = CONFIG.cloudBaseElevation.toFixed(0);
-      });
+      bindRange('cloud-elevation', 'cloudBaseElevation', (v) => v.toFixed(0));
+      bindRange('cloud-terrain-influence', 'cloudTerrainInfluence', (v) => `${Math.round(v * 100)}%`);
+      bindRange('cloud-min-sphere-ratio', 'minSphereRatio', (v) => v.toFixed(2));
+      bindRange('cloud-min-sphere-clamp', 'minSphereClamp', (v) => v.toFixed(2));
+      bindRange('cloud-radius-factor', 'cloudRadiusFactor', (v) => v.toFixed(2));
+      bindRange('cloud-x-ratio', 'cloudXRatio', (v) => v.toFixed(2));
+      bindRange('cloud-y-ratio', 'cloudYRatio', (v) => v.toFixed(2));
+      bindRange('cloud-z-ratio', 'cloudZRatio', (v) => v.toFixed(2));
 
       function pointerToGround(clientX, clientY) {
         const rect = renderer.domElement.getBoundingClientRect();
@@ -534,9 +557,9 @@
         const cloudScale = THREE.MathUtils.lerp(CONFIG.minCloudScale, CONFIG.maxCloudScale, player.waterContent);
         const aspect = window.innerWidth / window.innerHeight;
         const maxCloudRadius = Math.min(frustumSize * aspect, frustumSize) * CONFIG.maxCloudScreenFraction * 0.5;
-        const cloudRadius = Math.min(maxCloudRadius, 3.2 * cloudScale);
-        const minSphereSize = cloudRadius * 0.11;
-        const particleSize = Math.max(0.12, minSphereSize * 0.25);
+        const cloudRadius = Math.min(maxCloudRadius, CONFIG.cloudRadiusFactor * cloudScale);
+        const minSphereSize = cloudRadius * CONFIG.minSphereRatio;
+        const particleSize = Math.max(CONFIG.minSphereClamp, minSphereSize * 0.25);
         vaporMat.size = particleSize;
         rainMat.size = particleSize;
 
@@ -548,11 +571,11 @@
         vaporMat.opacity = 1.0;
         const vapAttr = vapor.geometry.attributes.position;
         for (let i = 0; i < vaporCount; i++) {
-          vapAttr.array[i * 3 + 1] += vaporVel[i] * dt;
+          vapAttr.array[i * 3 + 1] -= vaporVel[i] * dt;
           vapAttr.array[i * 3] += Math.sin(time * 1.4 + i) * 0.006;
-          if (vapAttr.array[i * 3 + 1] > -0.28) {
+          if (vapAttr.array[i * 3 + 1] < -CONFIG.rainFallDepth) {
             vapAttr.array[i * 3] = (Math.random() - 0.5) * cloudRadius * 1.05;
-            vapAttr.array[i * 3 + 1] = -1.7 - Math.random() * 0.9;
+            vapAttr.array[i * 3 + 1] = -0.2;
             vapAttr.array[i * 3 + 2] = (Math.random() - 0.5) * cloudRadius * 1.05;
           }
         }
@@ -563,7 +586,7 @@
           const attr = rain.geometry.attributes.position;
           for (let i = 0; i < rainCount; i++) {
             attr.array[i * 3 + 1] -= rainVel[i] * dt;
-            if (attr.array[i * 3 + 1] < -cloudRadius * 1.7) {
+            if (attr.array[i * 3 + 1] < -CONFIG.rainFallDepth) {
               attr.array[i * 3] = (Math.random() - 0.5) * cloudRadius * 1.1;
               attr.array[i * 3 + 1] = -0.2;
               attr.array[i * 3 + 2] = (Math.random() - 0.5) * cloudRadius * 1.1;
@@ -575,7 +598,8 @@
         pruneFlowers();
 
         const minYAboveWater = CONFIG.waterLevel + CONFIG.minCloudWaterClearance + cloudRadius * 0.6;
-        const floatY = Math.max(minYAboveWater, ground + CONFIG.cloudBaseElevation + Math.sin(time * 2.2) * 0.26);
+        const terrainAdjustedElevation = CONFIG.cloudBaseElevation + ground * CONFIG.cloudTerrainInfluence;
+        const floatY = Math.max(minYAboveWater, terrainAdjustedElevation + Math.sin(time * 2.2) * 0.26);
         player.pos.y += (floatY - player.pos.y) * Math.min(1, dt * 4.6);
         player.pos.y = Math.max(player.pos.y, minYAboveWater);
 
@@ -592,7 +616,7 @@
           const dynamicSize = entry.baseSize * life * pulse * (0.95 + centerWeight * 1.45);
           const minSize = minSphereSize * (0.62 + centerWeight * 0.4);
           const s = Math.max(minSize, dynamicSize);
-          const local = entry.offset.clone().normalize().multiplyScalar(0.2 + life * cloudRadius * (0.5 + centerWeight * 0.9));
+          const local = entry.offset.clone().normalize().multiply(new THREE.Vector3(CONFIG.cloudXRatio, CONFIG.cloudYRatio, CONFIG.cloudZRatio)).setLength(0.2 + life * cloudRadius * (0.5 + centerWeight * 0.9));
           entry.mesh.visible = s > 0.06;
           entry.mesh.position.copy(local);
           entry.mesh.scale.setScalar(Math.max(0.001, s));
