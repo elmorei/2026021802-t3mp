@@ -3,12 +3,13 @@ https://<your-github-username>.github.io/2026021802-t3mp/
 # Lowpoly Cloud Explorer (GitHub Pages)
 
 This repository now hosts a lowpoly 3D isometric-style browser demo featuring:
-- A non-perspective (orthographic) isometric-style camera with a gear-menu view-angle control (default **45°**).
+- A non-perspective (orthographic) isometric-style camera with a gear-menu for view angle (default **45°**), cloud spin control, and light brightness control (50% to 500%).
 - A player cloud you can move with **WASD / Arrow keys** or **click/tap-to-move**.
+- Opening the settings menu pauses simulation until closed.
 - Procedurally generated multi-scale terrain with **large oceans**, **high ranges**, **water**, and **trees**.
 - Chunk-based streaming so terrain supports effectively **unlimited travel** in any direction.
-- Cloud lifecycle behavior: over water it gains sparkling vapor and grows, and at high elevations it darkens/rains then shrinks back toward white.
-- Transparent shallow-water rendering with a lighter color palette.
+- Cloud lifecycle behavior: over water it gains sparkling vapor and grows (denser footprint), and at high elevations it darkens before rain then shrinks back toward white.
+- Transparent shallow-water rendering with a lighter color palette and smoother terrain color blending.
 
 ## Steps to take the page live after merge
 
