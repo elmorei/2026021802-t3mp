@@ -3,7 +3,7 @@ https://<your-github-username>.github.io/2026021802-t3mp/
 # Lowpoly Cloud Explorer (GitHub Pages)
 
 This repository now hosts a lowpoly 3D isometric-style browser demo featuring:
-- A non-perspective (orthographic) isometric-style camera with a gear-menu for view angle (default **20°**), cloud spin, light brightness (50% to 500%), cloud elevation controls (default **30**, max **100**), elevation-change %, sphere sizing, cloud XYZ proportions, rain-area ratio, and particle-size ratio controls.
+- A non-perspective (orthographic) isometric-style camera with a gear-menu for view angle (default **40°**), cloud spin, light brightness (100% to 2000%), cloud elevation controls (default **60**, max **400**), elevation-change %, sphere sizing, cloud XYZ proportions, center pull factor, rain-area ratio, particle-size ratio, plus rain/vapor speed and density controls.
 - A player cloud you can move with **WASD / Arrow keys** or **click/tap-to-move**.
 - Opening the settings menu pauses simulation until closed.
 - Procedurally generated multi-scale terrain with **large oceans**, **high ranges**, occasional **snowy high peaks**, **water**, and **trees**.
